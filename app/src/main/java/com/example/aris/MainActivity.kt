@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                ArisHome(
+                ArisNavigation(
                     depositoDao = depositoDao,
                     onAnnouncePayment = { amount ->
                         if (voiceReady) {
@@ -119,82 +119,28 @@ class MainActivity : ComponentActivity() {
 }
 
 
+
 @Composable
 fun ArisHome(
     depositoDao: DepositoDao,
-    onAnnouncePayment: (Int) -> Unit
+    onAnnouncePayment: (Int) -> Unit,
+    onVerHistorial: () -> Unit
 ) {
     val depositos by depositoDao
         .obtenerTodos()
         .collectAsState(initial = emptyList())
 
     val coroutineScope = rememberCoroutineScope()
-
     var importeTexto by rememberSaveable { mutableStateOf("") }
+
     val importeValido = importeTexto.toIntOrNull()?.let { it > 0 } == true
-
-    // Filtros del historial
-    var periodo by rememberSaveable { mutableStateOf("Mes") }
-    var mesSeleccionado by rememberSaveable { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
-    var anioSeleccionado by rememberSaveable { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
-    var antiguosPrimero by rememberSaveable { mutableStateOf(false) }
-    var cantidadVisible by rememberSaveable { mutableIntStateOf(5) }
-
     val ahora = Calendar.getInstance()
-
-    val inicioPeriodo = remember(periodo, mesSeleccionado, anioSeleccionado) {
-        val cal = Calendar.getInstance()
-        when (periodo) {
-            "Día" -> {
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-            }
-            "Mes" -> {
-                cal.set(Calendar.MONTH, mesSeleccionado)
-                cal.set(Calendar.YEAR, anioSeleccionado)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-            }
-            "Año" -> {
-                cal.set(Calendar.YEAR, anioSeleccionado)
-                cal.set(Calendar.MONTH, Calendar.JANUARY)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-            }
-        }
-        cal.timeInMillis
-    }
-
-    val finPeriodo = remember(periodo, inicioPeriodo) {
-        Calendar.getInstance().apply {
-            timeInMillis = inicioPeriodo
-            when (periodo) {
-                "Día" -> add(Calendar.DAY_OF_MONTH, 1)
-                "Mes" -> add(Calendar.MONTH, 1)
-                "Año" -> add(Calendar.YEAR, 1)
-            }
-        }.timeInMillis
-    }
-
-    val depositosFiltrados by depositoDao.obtenerFiltrados(
-        inicio = inicioPeriodo,
-        fin = finPeriodo,
-        antiguosPrimero = if (antiguosPrimero) 1 else 0,
-        limite = cantidadVisible,
-        desplazamiento = 0
-    ).collectAsState(initial = emptyList())
 
     val totalHoy = depositos
         .filter {
-            val cal = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = it.fechaHora
+            }
             cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
                     cal.get(Calendar.DAY_OF_YEAR) == ahora.get(Calendar.DAY_OF_YEAR)
         }
@@ -202,7 +148,9 @@ fun ArisHome(
 
     val totalMes = depositos
         .filter {
-            val cal = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = it.fechaHora
+            }
             cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
                     cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH)
         }
@@ -269,7 +217,9 @@ fun ArisHome(
             OutlinedTextField(
                 value = importeTexto,
                 onValueChange = { nuevoValor ->
-                    if (nuevoValor.all { it.isDigit() } && nuevoValor.length <= 10) {
+                    if (nuevoValor.all { it.isDigit() } &&
+                        nuevoValor.length <= 10
+                    ) {
                         importeTexto = nuevoValor
                     }
                 },
@@ -287,8 +237,10 @@ fun ArisHome(
             Button(
                 onClick = {
                     val importe = importeTexto.toIntOrNull()
+
                     if (importe != null && importe > 0) {
                         val deposito = Deposito(importe = importe)
+
                         coroutineScope.launch {
                             depositoDao.insertar(deposito)
                             onAnnouncePayment(deposito.importe)
@@ -317,116 +269,34 @@ fun ArisHome(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(20.dp))
 
-            Text(
-                text = "Historial de depósitos",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf("Día", "Mes", "Año").forEach { opcion ->
-                    FilterChip(
-                        selected = periodo == opcion,
-                        onClick = {
-                            periodo = opcion
-                            cantidadVisible = 5
-                        },
-                        label = { Text(opcion) }
-                    )
-                }
-            }
-
-            if (periodo != "Día") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (periodo == "Mes") {
-                        val nombresMeses = listOf(
-                            "Enero", "Febrero", "Marzo", "Abril",
-                            "Mayo", "Junio", "Julio", "Agosto",
-                            "Septiembre", "Octubre", "Noviembre", "Diciembre"
-                        )
-                        var menuMesAbierto by remember { mutableStateOf(false) }
-
-                        Box {
-                            TextButton(onClick = { menuMesAbierto = true }) {
-                                Text(nombresMeses[mesSeleccionado])
-                            }
-                            DropdownMenu(
-                                expanded = menuMesAbierto,
-                                onDismissRequest = { menuMesAbierto = false }
-                            ) {
-                                nombresMeses.forEachIndexed { indice, nombre ->
-                                    DropdownMenuItem(
-                                        text = { Text(nombre) },
-                                        onClick = {
-                                            mesSeleccionado = indice
-                                            menuMesAbierto = false
-                                            cantidadVisible = 5
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = {
-                                anioSeleccionado--
-                                cantidadVisible = 5
-                            }
-                        ) { Text("−") }
-
-                        Text(anioSeleccionado.toString())
-
-                        TextButton(
-                            onClick = {
-                                anioSeleccionado++
-                                cantidadVisible = 5
-                            }
-                        ) { Text("+") }
-                    }
-                }
-            }
-
-            OutlinedButton(
-                onClick = {
-                    antiguosPrimero = !antiguosPrimero
-                    cantidadVisible = 5
-                },
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (antiguosPrimero) {
-                        "Orden: más antiguos primero"
-                    } else {
-                        "Orden: más recientes primero"
-                    }
+                    text = "Últimos depósitos",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
+
+                TextButton(onClick = onVerHistorial) {
+                    Text("Ver todo →")
+                }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            if (depositosFiltrados.isEmpty()) {
+            if (depositos.isEmpty()) {
                 Text(
-                    text = "No hay depósitos en el periodo seleccionado.",
+                    text = "Todavía no hay depósitos registrados.",
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 24.dp),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium
+                    textAlign = TextAlign.Center
                 )
             } else {
-                depositosFiltrados.forEach { deposito ->
+                depositos.take(5).forEach { deposito ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -453,18 +323,10 @@ fun ArisHome(
                             fontWeight = FontWeight.Bold
                         )
                     }
+
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.surfaceVariant
                     )
-                }
-
-                if (depositosFiltrados.size == cantidadVisible) {
-                    OutlinedButton(
-                        onClick = { cantidadVisible += 5 },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Cargar los siguientes 5")
-                    }
                 }
             }
         }
