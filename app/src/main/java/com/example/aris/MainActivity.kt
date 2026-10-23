@@ -1,6 +1,8 @@
 
 package com.example.aris
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.FilterChip
@@ -116,6 +118,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 @Composable
 fun ArisHome(
     depositoDao: DepositoDao,
@@ -130,31 +133,79 @@ fun ArisHome(
     var importeTexto by rememberSaveable { mutableStateOf("") }
     val importeValido = importeTexto.toIntOrNull()?.let { it > 0 } == true
 
-    val hoy = remember(depositos) {
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        calendar.timeInMillis
+    // Filtros del historial
+    var periodo by rememberSaveable { mutableStateOf("Mes") }
+    var mesSeleccionado by rememberSaveable { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
+    var anioSeleccionado by rememberSaveable { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
+    var antiguosPrimero by rememberSaveable { mutableStateOf(false) }
+    var cantidadVisible by rememberSaveable { mutableIntStateOf(5) }
+
+    val ahora = Calendar.getInstance()
+
+    val inicioPeriodo = remember(periodo, mesSeleccionado, anioSeleccionado) {
+        val cal = Calendar.getInstance()
+        when (periodo) {
+            "Día" -> {
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+            }
+            "Mes" -> {
+                cal.set(Calendar.MONTH, mesSeleccionado)
+                cal.set(Calendar.YEAR, anioSeleccionado)
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+            }
+            "Año" -> {
+                cal.set(Calendar.YEAR, anioSeleccionado)
+                cal.set(Calendar.MONTH, Calendar.JANUARY)
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+            }
+        }
+        cal.timeInMillis
     }
 
-    val inicioMes = remember(depositos) {
-        val calendar = Calendar.getInstance()
-        calendar.set(Calendar.DAY_OF_MONTH, 1)
-        calendar.set(Calendar.HOUR_OF_DAY, 0)
-        calendar.set(Calendar.MINUTE, 0)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        calendar.timeInMillis
+    val finPeriodo = remember(periodo, inicioPeriodo) {
+        Calendar.getInstance().apply {
+            timeInMillis = inicioPeriodo
+            when (periodo) {
+                "Día" -> add(Calendar.DAY_OF_MONTH, 1)
+                "Mes" -> add(Calendar.MONTH, 1)
+                "Año" -> add(Calendar.YEAR, 1)
+            }
+        }.timeInMillis
     }
+
+    val depositosFiltrados by depositoDao.obtenerFiltrados(
+        inicio = inicioPeriodo,
+        fin = finPeriodo,
+        antiguosPrimero = if (antiguosPrimero) 1 else 0,
+        limite = cantidadVisible,
+        desplazamiento = 0
+    ).collectAsState(initial = emptyList())
 
     val totalHoy = depositos
-        .filter { it.fechaHora >= hoy }
+        .filter {
+            val cal = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
+            cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
+                    cal.get(Calendar.DAY_OF_YEAR) == ahora.get(Calendar.DAY_OF_YEAR)
+        }
         .sumOf { it.importe }
 
     val totalMes = depositos
-        .filter { it.fechaHora >= inicioMes }
+        .filter {
+            val cal = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
+            cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
+                    cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH)
+        }
         .sumOf { it.importe }
 
     Surface(
@@ -175,9 +226,7 @@ fun ArisHome(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-
             Text("Tu asistente de pagos")
-
             Spacer(modifier = Modifier.height(32.dp))
 
             Card(
@@ -189,9 +238,7 @@ fun ArisHome(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text("Total recibido hoy")
-
                     Spacer(modifier = Modifier.height(8.dp))
-
                     Text(
                         text = formatPesos(totalHoy),
                         fontSize = 28.sp,
@@ -208,9 +255,7 @@ fun ArisHome(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text("Total recibido este mes")
-
                     Spacer(modifier = Modifier.height(8.dp))
-
                     Text(
                         text = formatPesos(totalMes),
                         fontSize = 28.sp,
@@ -242,10 +287,8 @@ fun ArisHome(
             Button(
                 onClick = {
                     val importe = importeTexto.toIntOrNull()
-
                     if (importe != null && importe > 0) {
                         val deposito = Deposito(importe = importe)
-
                         coroutineScope.launch {
                             depositoDao.insertar(deposito)
                             onAnnouncePayment(deposito.importe)
@@ -271,9 +314,7 @@ fun ArisHome(
             )
 
             Spacer(modifier = Modifier.height(32.dp))
-
             HorizontalDivider()
-
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
@@ -285,15 +326,107 @@ fun ArisHome(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (depositos.isEmpty()) {
-                Text(
-                    text = "Todavía no hay depósitos registrados.",
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("Día", "Mes", "Año").forEach { opcion ->
+                    FilterChip(
+                        selected = periodo == opcion,
+                        onClick = {
+                            periodo = opcion
+                            cantidadVisible = 5
+                        },
+                        label = { Text(opcion) }
+                    )
+                }
+            }
+
+            if (periodo != "Día") {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (periodo == "Mes") {
+                        val nombresMeses = listOf(
+                            "Enero", "Febrero", "Marzo", "Abril",
+                            "Mayo", "Junio", "Julio", "Agosto",
+                            "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                        )
+                        var menuMesAbierto by remember { mutableStateOf(false) }
+
+                        Box {
+                            TextButton(onClick = { menuMesAbierto = true }) {
+                                Text(nombresMeses[mesSeleccionado])
+                            }
+                            DropdownMenu(
+                                expanded = menuMesAbierto,
+                                onDismissRequest = { menuMesAbierto = false }
+                            ) {
+                                nombresMeses.forEachIndexed { indice, nombre ->
+                                    DropdownMenuItem(
+                                        text = { Text(nombre) },
+                                        onClick = {
+                                            mesSeleccionado = indice
+                                            menuMesAbierto = false
+                                            cantidadVisible = 5
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = {
+                                anioSeleccionado--
+                                cantidadVisible = 5
+                            }
+                        ) { Text("−") }
+
+                        Text(anioSeleccionado.toString())
+
+                        TextButton(
+                            onClick = {
+                                anioSeleccionado++
+                                cantidadVisible = 5
+                            }
+                        ) { Text("+") }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    antiguosPrimero = !antiguosPrimero
+                    cantidadVisible = 5
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (antiguosPrimero) {
+                        "Orden: más antiguos primero"
+                    } else {
+                        "Orden: más recientes primero"
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (depositosFiltrados.isEmpty()) {
+                Text(
+                    text = "No hay depósitos en el periodo seleccionado.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
-                depositos.forEach { deposito ->
+                depositosFiltrados.forEach { deposito ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -306,7 +439,6 @@ fun ArisHome(
                                 text = "Depósito recibido",
                                 fontWeight = FontWeight.Medium
                             )
-
                             Text(
                                 text = formatFecha(deposito.fechaHora),
                                 style = MaterialTheme.typography.bodySmall
@@ -321,13 +453,24 @@ fun ArisHome(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                if (depositosFiltrados.size == cantidadVisible) {
+                    OutlinedButton(
+                        onClick = { cantidadVisible += 5 },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cargar los siguientes 5")
+                    }
                 }
             }
         }
     }
 }
+
 
 fun formatPesos(amount: Int): String {
     return NumberFormat
