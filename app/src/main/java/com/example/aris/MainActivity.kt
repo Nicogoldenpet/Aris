@@ -1,6 +1,7 @@
 
 package com.example.aris
 
+import com.example.aris.ui.theme.ArisTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
@@ -84,8 +85,8 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme {
-                ArisHome(
+            ArisTheme {
+                ArisNavigation(
                     depositoDao = depositoDao,
                     onAnnouncePayment = { amount ->
                         if (voiceReady) {
@@ -122,176 +123,241 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ArisHome(
     depositoDao: DepositoDao,
-    onAnnouncePayment: (Int) -> Unit
+    onAnnouncePayment: (Int) -> Unit,
+    onVerHistorial: () -> Unit
 ) {
-    val depositos by depositoDao
-        .obtenerTodos()
-        .collectAsState(initial = emptyList())
-
+    val depositos by depositoDao.obtenerTodos().collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
     var importeTexto by rememberSaveable { mutableStateOf("") }
     val importeValido = importeTexto.toIntOrNull()?.let { it > 0 } == true
 
-    // Filtros del historial
-    var periodo by rememberSaveable { mutableStateOf("Mes") }
-    var mesSeleccionado by rememberSaveable { mutableIntStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
-    var anioSeleccionado by rememberSaveable { mutableIntStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
-    var antiguosPrimero by rememberSaveable { mutableStateOf(false) }
-    var cantidadVisible by rememberSaveable { mutableIntStateOf(5) }
-
     val ahora = Calendar.getInstance()
 
-    val inicioPeriodo = remember(periodo, mesSeleccionado, anioSeleccionado) {
-        val cal = Calendar.getInstance()
-        when (periodo) {
-            "Día" -> {
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-            }
-            "Mes" -> {
-                cal.set(Calendar.MONTH, mesSeleccionado)
-                cal.set(Calendar.YEAR, anioSeleccionado)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-            }
-            "Año" -> {
-                cal.set(Calendar.YEAR, anioSeleccionado)
-                cal.set(Calendar.MONTH, Calendar.JANUARY)
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                cal.set(Calendar.HOUR_OF_DAY, 0)
-                cal.set(Calendar.MINUTE, 0)
-                cal.set(Calendar.SECOND, 0)
-                cal.set(Calendar.MILLISECOND, 0)
-            }
-        }
-        cal.timeInMillis
-    }
+    val totalHoy = depositos.filter {
+        val fecha = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
+        fecha.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
+                fecha.get(Calendar.DAY_OF_YEAR) == ahora.get(Calendar.DAY_OF_YEAR)
+    }.sumOf { it.importe }
 
-    val finPeriodo = remember(periodo, inicioPeriodo) {
-        Calendar.getInstance().apply {
-            timeInMillis = inicioPeriodo
-            when (periodo) {
-                "Día" -> add(Calendar.DAY_OF_MONTH, 1)
-                "Mes" -> add(Calendar.MONTH, 1)
-                "Año" -> add(Calendar.YEAR, 1)
-            }
-        }.timeInMillis
-    }
+    val totalMes = depositos.filter {
+        val fecha = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
+        fecha.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
+                fecha.get(Calendar.MONTH) == ahora.get(Calendar.MONTH)
+    }.sumOf { it.importe }
 
-    val depositosFiltrados by depositoDao.obtenerFiltrados(
-        inicio = inicioPeriodo,
-        fin = finPeriodo,
-        antiguosPrimero = if (antiguosPrimero) 1 else 0,
-        limite = cantidadVisible,
-        desplazamiento = 0
-    ).collectAsState(initial = emptyList())
 
-    val totalHoy = depositos
-        .filter {
-            val cal = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
-            cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
-                    cal.get(Calendar.DAY_OF_YEAR) == ahora.get(Calendar.DAY_OF_YEAR)
-        }
-        .sumOf { it.importe }
+    val modoOscuro = androidx.compose.foundation.isSystemInDarkTheme()
 
-    val totalMes = depositos
-        .filter {
-            val cal = Calendar.getInstance().apply { timeInMillis = it.fechaHora }
-            cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
-                    cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH)
-        }
-        .sumOf { it.importe }
+    val azulAris = if (modoOscuro) Color(0xFF142B40) else Color(0xFF163A5F)
+    val azulInput = if (modoOscuro) Color(0xFF163A5F) else Color.White
+    val verdeAgua = Color(0xFF35C6B0)
+    val verdeSuave = if (modoOscuro) Color(0xFF25483F) else Color(0xFFE3F7F3)
+    val grisSuave = if (modoOscuro) Color(0xFF35C6B0) else Color(0xFFE3F7F3)
+    val grisTexto = if (modoOscuro) Color(0xFFB7C6D1) else Color(0xFF647582)
+    val grisTextoDos = if (modoOscuro) Color(0xFF1B2B3A) else Color(0xFF647582)
+    val grisCard = if (modoOscuro) Color(0xFF647582) else Color(0xFFB7C6D1)
+
+    val fondoAris = if (modoOscuro) Color(0xFF101C28) else Color(0xFFF4F8FA)
+    val tarjetaMes = if (modoOscuro) Color(0xFF1B2B3A) else Color.White
+    val textoPrincipal = if (modoOscuro) Color(0xFFEAF2F7) else Color(0xFF203344)
+    val textoOscuro = Color(0xFF203344)
+
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = fondoAris
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
-            Text(
-                text = "Aris",
-                fontSize = 32.sp,
-                style = MaterialTheme.typography.headlineLarge
-            )
+            // Encabezado
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = verdeAgua,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "A",
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = azulAris
+                        )
+                    }
+                }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Tu asistente de pagos")
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
+                Column {
+                    Text(
+                        text = "Aris",
+                        fontSize = 29.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = textoPrincipal
+                    )
+                    Text(
+                        text = "Tu asistente de pagos",
+                        fontSize = 14.sp,
+                        color = grisTexto
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Total recibido hoy
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = azulAris)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Total recibido hoy")
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        text = "TOTAL RECIBIDO HOY",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD6E8F5)
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Text(
                         text = formatPesos(totalHoy),
-                        fontSize = 28.sp,
-                        style = MaterialTheme.typography.headlineMedium
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Ingresos registrados durante el día",
+                        fontSize = 13.sp,
+                        color = verdeAgua
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Total del mes
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = tarjetaMes),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Total recibido este mes")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = formatPesos(totalMes),
-                        fontSize = 28.sp,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Total recibido este mes",
+                            fontSize = 14.sp,
+                            color = grisTexto
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = formatPesos(totalMes),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textoPrincipal
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = verdeAgua,
+                        modifier = Modifier.size(52.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "COP",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textoOscuro
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Formulario de registro
+            Text(
+                text = "Registrar un ingreso",
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                color = textoPrincipal
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Introduce el importe del depósito que recibiste.",
+                fontSize = 14.sp,
+                color = grisTexto
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = importeTexto,
                 onValueChange = { nuevoValor ->
-                    if (nuevoValor.all { it.isDigit() } && nuevoValor.length <= 10) {
+                    if (nuevoValor.all { it.isDigit() }) {
                         importeTexto = nuevoValor
                     }
                 },
-                label = { Text("Importe del depósito (COP)") },
-                placeholder = { Text("Ej. 25000") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number
-                ),
+                label = {
+                    Text(
+                        text = "Importe en pesos",
+                        color = Color(0xFF647582)
+                    )
+                },
+                placeholder = {
+                    Text(
+                        text = "Ej. 25000",
+                        color = Color(0xFF84939E)
+                    )
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = if (modoOscuro) Color(0xFFEAF2F7) else Color(0xFF203344),
+                    unfocusedTextColor = if (modoOscuro) Color(0xFFEAF2F7) else Color(0xFF203344),
+                    focusedContainerColor = azulInput,
+                    unfocusedContainerColor = azulInput,
+                    focusedBorderColor = verdeAgua,
+                    unfocusedBorderColor = if (modoOscuro) Color(0xFF1E507C) else Color(0xFFB8C5CE),
+                    cursorColor = verdeAgua,
+                    focusedLabelColor = verdeAgua,
+                    unfocusedLabelColor = grisTexto
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Button(
                 onClick = {
                     val importe = importeTexto.toIntOrNull()
+
                     if (importe != null && importe > 0) {
-                        val deposito = Deposito(importe = importe)
                         coroutineScope.launch {
-                            depositoDao.insertar(deposito)
-                            onAnnouncePayment(deposito.importe)
+                            depositoDao.insertar(Deposito(importe = importe))
+                            onAnnouncePayment(importe)
                             importeTexto = ""
                         }
                     }
@@ -300,170 +366,146 @@ fun ArisHome(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = verdeAgua,
+                    contentColor = azulAris,
+                    disabledContainerColor = if (modoOscuro) Color(0xFF354653) else Color(0xFFDDE5E9),
+                    disabledContentColor = if (modoOscuro) Color(0xFFEAF2F7) else Color(0xFF526B72)
+                )
             ) {
-                Text("Registrar depósito", fontSize = 16.sp)
+                Text(
+                    text = "Registrar depósito",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Modo de prueba: no se ha recibido dinero real.",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "Historial de depósitos",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                text = "Modo de prueba: este registro no confirma un pago real.",
+                fontSize = 12.sp,
+                color = grisTexto,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(30.dp))
 
+            // Últimos depósitos
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("Día", "Mes", "Año").forEach { opcion ->
-                    FilterChip(
-                        selected = periodo == opcion,
-                        onClick = {
-                            periodo = opcion
-                            cantidadVisible = 5
-                        },
-                        label = { Text(opcion) }
+                Text(
+                    text = "Últimos depósitos",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textoPrincipal
+                )
+
+                TextButton(onClick = onVerHistorial) {
+                    Text(
+                        text = "Ver todo →",
+                        color = textoPrincipal,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            if (periodo != "Día") {
-                Row(
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (depositos.isEmpty()) {
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
-                    if (periodo == "Mes") {
-                        val nombresMeses = listOf(
-                            "Enero", "Febrero", "Marzo", "Abril",
-                            "Mayo", "Junio", "Julio", "Agosto",
-                            "Septiembre", "Octubre", "Noviembre", "Diciembre"
-                        )
-                        var menuMesAbierto by remember { mutableStateOf(false) }
-
-                        Box {
-                            TextButton(onClick = { menuMesAbierto = true }) {
-                                Text(nombresMeses[mesSeleccionado])
-                            }
-                            DropdownMenu(
-                                expanded = menuMesAbierto,
-                                onDismissRequest = { menuMesAbierto = false }
-                            ) {
-                                nombresMeses.forEachIndexed { indice, nombre ->
-                                    DropdownMenuItem(
-                                        text = { Text(nombre) },
-                                        onClick = {
-                                            mesSeleccionado = indice
-                                            menuMesAbierto = false
-                                            cantidadVisible = 5
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = {
-                                anioSeleccionado--
-                                cantidadVisible = 5
-                            }
-                        ) { Text("−") }
-
-                        Text(anioSeleccionado.toString())
-
-                        TextButton(
-                            onClick = {
-                                anioSeleccionado++
-                                cantidadVisible = 5
-                            }
-                        ) { Text("+") }
-                    }
-                }
-            }
-
-            OutlinedButton(
-                onClick = {
-                    antiguosPrimero = !antiguosPrimero
-                    cantidadVisible = 5
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    if (antiguosPrimero) {
-                        "Orden: más antiguos primero"
-                    } else {
-                        "Orden: más recientes primero"
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (depositosFiltrados.isEmpty()) {
-                Text(
-                    text = "No hay depósitos en el periodo seleccionado.",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                depositosFiltrados.forEach { deposito ->
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Depósito recibido",
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = formatFecha(deposito.fechaHora),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
+                        Text(
+                            text = "Aún no hay depósitos",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = azulAris
+                        )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "+ ${formatPesos(deposito.importe)}",
-                            color = Color(0xFF2E7D32),
-                            fontWeight = FontWeight.Bold
+                            text = "Cuando registres un ingreso, aparecerá aquí.",
+                            fontSize = 13.sp,
+                            color = grisTexto,
+                            textAlign = TextAlign.Center
                         )
                     }
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    )
                 }
+            } else {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = tarjetaMes)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        depositos.take(5).forEachIndexed { indice, deposito ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 15.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = grisSuave,
+                                    modifier = Modifier.size(42.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "+",
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = azulAris
+                                        )
+                                    }
+                                }
 
-                if (depositosFiltrados.size == cantidadVisible) {
-                    OutlinedButton(
-                        onClick = { cantidadVisible += 5 },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Cargar los siguientes 5")
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Depósito recibido",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = textoPrincipal
+                                    )
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Text(
+                                        text = formatFecha(deposito.fechaHora),
+                                        fontSize = 12.sp,
+                                        color = grisTexto
+                                    )
+                                }
+
+                                Text(
+                                    text = "+ ${formatPesos(deposito.importe)}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = verdeAgua
+                                )
+                            }
+
+                            if (indice < depositos.take(5).lastIndex) {
+                                HorizontalDivider(color = Color(0xFFE8EEF2))
+                            }
+                        }
                     }
                 }
             }
