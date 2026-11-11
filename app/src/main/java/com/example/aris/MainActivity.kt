@@ -63,6 +63,18 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+
+
+private data class IngresoDia(
+    val etiqueta: String,
+    val total: Long
+)
 
 class MainActivity : ComponentActivity() {
 
@@ -145,6 +157,47 @@ fun ArisHome(
         fecha.get(Calendar.YEAR) == ahora.get(Calendar.YEAR) &&
                 fecha.get(Calendar.MONTH) == ahora.get(Calendar.MONTH)
     }.sumOf { it.importe }
+
+    val ingresosUltimosSieteDias = remember(depositos) {
+        (6 downTo 0).map { diasAtras ->
+
+            // Calculamos el inicio del día.
+            val inicioDia = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, -diasAtras)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            // Calculamos el inicio del día siguiente.
+            val finDia = Calendar.getInstance().apply {
+                timeInMillis = inicioDia.timeInMillis
+                add(Calendar.DAY_OF_YEAR, 1)
+            }
+
+            // Sumamos los depósitos correspondientes a ese día.
+            val totalDia = depositos
+                .filter {
+                    it.fechaHora >= inicioDia.timeInMillis &&
+                            it.fechaHora < finDia.timeInMillis
+                }
+                .sumOf { it.importe.toLong() }
+
+            // Obtenemos el nombre corto del día.
+            val nombreDia = SimpleDateFormat(
+                "EEE",
+                Locale("es", "CO")
+            ).format(inicioDia.time)
+                .replace(".", "")
+                .replaceFirstChar { it.uppercase(Locale("es", "CO")) }
+
+            IngresoDia(
+                etiqueta = nombreDia,
+                total = totalDia
+            )
+        }
+    }
 
 
     val modoOscuro = androidx.compose.foundation.isSystemInDarkTheme()
@@ -291,6 +344,17 @@ fun ArisHome(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Gráfica de ingresos semanales
+            GraficaIngresosSemana(
+                datos = ingresosUltimosSieteDias,
+                colorTarjeta = tarjetaMes,
+                colorTexto = textoPrincipal,
+                colorSecundario = grisTexto,
+                colorBarra = verdeAgua
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -512,6 +576,190 @@ fun ArisHome(
         }
     }
 }
+
+
+@Composable
+private fun GraficaIngresosSemana(
+    datos: List<IngresoDia>,
+    colorTarjeta: Color,
+    colorTexto: Color,
+    colorSecundario: Color,
+    colorBarra: Color
+) {
+    val maximo = datos.maxOfOrNull { it.total }
+        ?.coerceAtLeast(1L) ?: 1L
+
+    var diaSeleccionado by remember(datos) {
+        mutableIntStateOf(datos.lastIndex)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = colorTarjeta
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp)
+        ) {
+            Text(
+                text = "Ingresos de los últimos 7 días",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = colorTexto
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Actividad diaria de tus depósitos",
+                fontSize = 12.sp,
+                color = colorSecundario
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Aquí dibujamos las siete barras.
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(125.dp)
+                    .pointerInput(datos) {
+                        detectTapGestures { posicion ->
+
+                            val anchoPorDia = size.width.toFloat() / datos.size
+
+                            val indice = (posicion.x / anchoPorDia)
+                                .toInt()
+                                .coerceIn(0, datos.lastIndex)
+
+                            diaSeleccionado = indice
+                        }
+                    }
+            ) {
+                val espacioPorDia = size.width / datos.size
+                val grosorBarra = espacioPorDia * 0.42f
+                val alturaMaxima = size.height * 0.90f
+
+                datos.forEachIndexed { indice, dia ->
+
+                    val centroX =
+                        espacioPorDia * indice + espacioPorDia / 2
+
+                    // Calculamos la altura según el ingreso.
+                    val proporcion =
+                        dia.total.toFloat() / maximo.toFloat()
+
+                    val alturaBarra =
+                        alturaMaxima * proporcion
+
+                    // Dibujamos el fondo de cada barra.
+                    drawLine(
+                        color = colorBarra.copy(alpha = 0.15f),
+                        start = Offset(
+                            x = centroX,
+                            y = size.height
+                        ),
+                        end = Offset(
+                            x = centroX,
+                            y = size.height - alturaMaxima
+                        ),
+                        strokeWidth = grosorBarra,
+                        cap = StrokeCap.Round
+                    )
+
+                    // Dibujamos el ingreso real.
+                    if (dia.total > 0L) {
+                        drawLine(
+                            color = if (indice == diaSeleccionado) {
+                                colorBarra
+                            } else {
+                                colorBarra.copy(alpha = 0.55f)
+                            },
+                            start = Offset(
+                                x = centroX,
+                                y = size.height
+                            ),
+                            end = Offset(
+                                x = centroX,
+                                y = size.height - alturaBarra
+                            ),
+                            strokeWidth = grosorBarra,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Etiquetas de los días.
+            Row(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                datos.forEach { dia ->
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = dia.etiqueta,
+                            fontSize = 11.sp,
+                            color = colorSecundario
+                        )
+                    }
+                }
+            }
+            val diaActual = datos.getOrNull(diaSeleccionado)
+
+            if (diaActual != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = colorBarra.copy(alpha = 0.12f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "TOTAL DEL DÍA",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colorSecundario
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = diaActual.etiqueta,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colorTexto
+                            )
+                        }
+
+                        Text(
+                            text = formatPesos(diaActual.total.toInt()),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colorBarra
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 
 fun formatPesos(amount: Int): String {

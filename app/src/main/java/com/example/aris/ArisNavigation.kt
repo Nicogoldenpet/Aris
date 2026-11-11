@@ -21,6 +21,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.luminance
 import com.example.aris.data.DepositoDao
 
 private sealed class ArisDestino(
@@ -47,21 +52,59 @@ fun ArisNavigation(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val rutaActual = backStackEntry?.destination?.route
 
+    val esModoOscuro =
+        MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+    val colorBarra = if (esModoOscuro) {
+        Color(0xFF1B2D3A)
+    } else {
+        Color(0xFFFFFFFF)
+    }
+
+    val colorSeleccionado = if (esModoOscuro) {
+        Color(0xFF4DD8C7)
+    } else {
+        Color(0xFF168F83)
+    }
+
+    val colorIndicador = if (esModoOscuro) {
+        Color(0xFF244B4A)
+    } else {
+        Color(0xFFDDF5F1)
+    }
+
+    val colorNoSeleccionado = if (esModoOscuro) {
+        Color(0xFFA8BBC9)
+    } else {
+        Color(0xFF607586)
+    }
+
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                modifier = Modifier.shadow(
+                    elevation = 8.dp
+                ),
+                containerColor = colorBarra,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 3.dp
+            ) {
                 destinos.forEach { destino ->
+
                     NavigationBarItem(
                         selected = rutaActual == destino.ruta,
+
                         onClick = {
                             navController.navigate(destino.ruta) {
                                 launchSingleTop = true
                                 restoreState = true
+
                                 popUpTo(navController.graph.startDestinationId) {
                                     saveState = true
                                 }
                             }
                         },
+
                         icon = {
                             when (destino) {
                                 ArisDestino.Inicio ->
@@ -74,7 +117,18 @@ fun ArisNavigation(
                                     Icon(Icons.Filled.Settings, contentDescription = null)
                             }
                         },
-                        label = { Text(destino.titulo) }
+
+                        label = {
+                            Text(destino.titulo)
+                        },
+
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = colorSeleccionado,
+                            selectedTextColor = colorSeleccionado,
+                            indicatorColor = colorIndicador,
+                            unselectedIconColor = colorNoSeleccionado,
+                            unselectedTextColor = colorNoSeleccionado
+                        )
                     )
                 }
             }

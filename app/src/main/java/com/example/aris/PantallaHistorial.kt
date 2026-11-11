@@ -14,6 +14,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.aris.data.DepositoDao
 import java.util.Calendar
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun PantallaHistorial(
@@ -88,6 +91,41 @@ fun PantallaHistorial(
         "Septiembre", "Octubre", "Noviembre", "Diciembre"
     )
 
+    // Detectamos el tema actual.
+    val esModoOscuro =
+        MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+// Colores propios de Aris.
+    val colorAcento = if (esModoOscuro) {
+        Color(0xFF4DD8C7)
+    } else {
+        Color(0xFF168F83)
+    }
+
+    val colorAcentoSuave = if (esModoOscuro) {
+        Color(0xFF244B4A)
+    } else {
+        Color(0xFFDDF5F1)
+    }
+
+    val colorTarjeta = if (esModoOscuro) {
+        Color(0xFF1B2D3A)
+    } else {
+        Color(0xFFFFFFFF)
+    }
+
+    val colorTextoSecundario = if (esModoOscuro) {
+        Color(0xFFA8BBC9)
+    } else {
+        Color(0xFF526779)
+    }
+
+    val colorBorde = if (esModoOscuro) {
+        Color(0xFF344A59)
+    } else {
+        Color(0xFFD8E2E8)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -120,7 +158,15 @@ fun PantallaHistorial(
                         periodo = opcion
                         cantidadVisible = 5
                     },
-                    label = { Text(opcion) }
+                    label = {
+                        Text(opcion)
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = colorAcentoSuave,
+                        selectedLabelColor = colorAcento,
+                        containerColor = colorTarjeta,
+                        labelColor = colorTextoSecundario
+                    )
                 )
             }
         }
@@ -139,18 +185,38 @@ fun PantallaHistorial(
                             Text(nombresMeses[mesSeleccionado])
                         }
 
+
                         DropdownMenu(
                             expanded = menuMesAbierto,
-                            onDismissRequest = { menuMesAbierto = false }
+                            onDismissRequest = { menuMesAbierto = false },
+                            containerColor = colorTarjeta,
+                            tonalElevation = 4.dp
                         ) {
                             nombresMeses.forEachIndexed { indice, nombre ->
                                 DropdownMenuItem(
-                                    text = { Text(nombre) },
+                                    text = {
+                                        Text(
+                                            text = nombre,
+                                            color = if (mesSeleccionado == indice) {
+                                                colorAcento
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
+                                            fontWeight = if (mesSeleccionado == indice) {
+                                                FontWeight.Bold
+                                            } else {
+                                                FontWeight.Normal
+                                            }
+                                        )
+                                    },
                                     onClick = {
                                         mesSeleccionado = indice
                                         menuMesAbierto = false
                                         cantidadVisible = 5
-                                    }
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = MaterialTheme.colorScheme.onSurface
+                                    )
                                 )
                             }
                         }
@@ -162,7 +228,10 @@ fun PantallaHistorial(
                         onClick = {
                             anioSeleccionado--
                             cantidadVisible = 5
-                        }
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = colorAcento
+                        )
                     ) {
                         Text("−")
                     }
@@ -173,7 +242,10 @@ fun PantallaHistorial(
                         onClick = {
                             anioSeleccionado++
                             cantidadVisible = 5
-                        }
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = colorAcento
+                        )
                     ) {
                         Text("+")
                     }
@@ -209,23 +281,44 @@ fun PantallaHistorial(
             )
         } else {
             depositos.forEach { deposito ->
-                ListItem(
-                    headlineContent = {
-                        Text("Depósito recibido")
-                    },
-                    supportingContent = {
-                        Text(formatFecha(deposito.fechaHora))
-                    },
-                    trailingContent = {
-                        Text(
-                            "+ ${formatPesos(deposito.importe)}",
-                            color = Color(0xFF2E7D32),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                )
 
-                HorizontalDivider()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = colorTarjeta
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 1.dp
+                    )
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = "Depósito recibido",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = formatFecha(deposito.fechaHora),
+                                color = colorTextoSecundario
+                            )
+                        },
+                        trailingContent = {
+                            Text(
+                                text = "+ ${formatPesos(deposito.importe)}",
+                                color = colorAcento,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        colors = ListItemDefaults.colors(
+                            containerColor = Color.Transparent
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (depositos.size == cantidadVisible) {
@@ -233,6 +326,10 @@ fun PantallaHistorial(
 
                 OutlinedButton(
                     onClick = { cantidadVisible += 5 },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = colorAcento
+                    ),
+                    border = BorderStroke(1.dp, colorBorde),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Cargar 5 más")
