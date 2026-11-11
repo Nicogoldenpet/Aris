@@ -1,6 +1,7 @@
 
 package com.example.aris
 
+import androidx.compose.ui.graphics.luminance
 import com.example.aris.ui.theme.ArisTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.TextButton
@@ -96,17 +97,33 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+
+        val preferencias = getSharedPreferences(
+            "aris_configuracion",
+            MODE_PRIVATE
+        )
+
         setContent {
-            ArisTheme {
+
+            var modoOscuro by remember {
+                mutableStateOf(
+                    preferencias.getBoolean("modo_oscuro", false)
+                )
+            }
+
+            ArisTheme(darkTheme = modoOscuro) {
+
                 ArisNavigation(
                     depositoDao = depositoDao,
                     onAnnouncePayment = { amount ->
+
                         if (voiceReady) {
                             val cantidadEnPalabras = amount.toWords()
 
                             val complementoPesos = when {
                                 amount == 1 -> "peso"
-                                amount >= 1_000_000 && amount % 1_000_000 == 0 -> "de pesos"
+                                amount >= 1_000_000 &&
+                                        amount % 1_000_000 == 0 -> "de pesos"
                                 else -> "pesos"
                             }
 
@@ -117,6 +134,18 @@ class MainActivity : ComponentActivity() {
                                 "pago-${System.currentTimeMillis()}"
                             )
                         }
+                    },
+
+                    // Estado actual del tema
+                    modoOscuro = modoOscuro,
+
+                    // Acción cuando el usuario cambia el interruptor
+                    onCambiarModoOscuro = { nuevoModo ->
+                        modoOscuro = nuevoModo
+
+                        preferencias.edit()
+                            .putBoolean("modo_oscuro", nuevoModo)
+                            .apply()
                     }
                 )
             }
@@ -200,7 +229,7 @@ fun ArisHome(
     }
 
 
-    val modoOscuro = androidx.compose.foundation.isSystemInDarkTheme()
+    val modoOscuro = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
     val azulAris = if (modoOscuro) Color(0xFF142B40) else Color(0xFF163A5F)
     val azulInput = if (modoOscuro) Color(0xFF163A5F) else Color.White

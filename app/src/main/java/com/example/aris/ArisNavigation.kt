@@ -40,7 +40,9 @@ private sealed class ArisDestino(
 @Composable
 fun ArisNavigation(
     depositoDao: DepositoDao,
-    onAnnouncePayment: (Int) -> Unit
+    onAnnouncePayment: (Int) -> Unit,
+    modoOscuro: Boolean,
+    onCambiarModoOscuro: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
     val destinos = listOf(
@@ -162,32 +164,11 @@ fun ArisNavigation(
             }
 
             composable(ArisDestino.Ajustes.ruta) {
-                PantallaAjustesPendiente()
+                PantallaAjustes(
+                    modoOscuro = modoOscuro,
+                    onCambiarModoOscuro = onCambiarModoOscuro
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun PantallaHistorialPendiente() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Aquí estará el historial de depósitos.")
-    }
-}
-
-@Composable
-private fun PantallaAjustesPendiente() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Aquí estarán los ajustes de Aris.")
     }
 }
